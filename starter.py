@@ -6,7 +6,7 @@ from llama_index.core.schema import QueryBundle
 from src.rag.ingestion.reader import load_documents_from_path
 from src.rag.ingestion.ingestion import run_ingestion
 from src.rag.ingestion.indexer import create_hierarchical_index
-from src.rag.retrieval.engine import build_query_engine
+from src.rag.retrieval.retreiver import build_query_engine
 
 def test_hybrid_retrieval():
     Settings.embed_model=OpenAIEmbedding(
@@ -31,8 +31,8 @@ def test_hybrid_retrieval():
     print("\n3. Building ChromaDB Index...")
     index = create_hierarchical_index(all_nodes, leaf_nodes, db_path="./chroma_db")
 
-    print("\n4. Building Query Engine from engine.py...")
-    # Import and initialize directly from engine.py!
+    print("\n4. Building Query Engine from retreiver.py...")
+    # Import and initialize directly from retreiver.py!
     query_engine = build_query_engine(index)
 
     print("\n5. Testing Retrieval...")

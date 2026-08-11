@@ -17,14 +17,17 @@ dependencies = [
     { name = "easyocr" },
     { name = "llama-index" },
     { name = "llama-index-embeddings-huggingface" },
+    { name = "llama-index-embeddings-openai-like" },
     { name = "llama-index-llms-ollama" },
     { name = "llama-index-llms-openai" },
+    { name = "llama-index-llms-openai-like" },
     { name = "llama-index-readers-file" },
     { name = "llama-index-retrievers-bm25" },
     { name = "llama-index-vector-stores-chroma" },
     { name = "pandas-stubs" },
     { name = "pymupdf" },
     { name = "pytesseract" },
+    { name = "python-dotenv" },
     { name = "sentence-transformers" },
 ]
 
@@ -35,14 +38,17 @@ requires-dist = [
     { name = "easyocr", specifier = ">=1.7.2" },
     { name = "llama-index", specifier = ">=0.14.23" },
     { name = "llama-index-embeddings-huggingface", specifier = ">=0.7.0" },
+    { name = "llama-index-embeddings-openai-like", specifier = ">=0.3.1" },
     { name = "llama-index-llms-ollama", specifier = ">=0.10.1" },
     { name = "llama-index-llms-openai", specifier = ">=0.7.10" },
+    { name = "llama-index-llms-openai-like", specifier = ">=0.7.2" },
     { name = "llama-index-readers-file", specifier = ">=0.6.0" },
     { name = "llama-index-retrievers-bm25", specifier = ">=0.7.1" },
     { name = "llama-index-vector-stores-chroma", specifier = ">=0.5.5" },
     { name = "pandas-stubs", specifier = "==3.0.5.260730" },
     { name = "pymupdf", specifier = ">=1.28.2" },
     { name = "pytesseract", specifier = ">=0.3.13" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "sentence-transformers", specifier = ">=5.7.0" },
 ]
 
@@ -1301,6 +1307,18 @@ wheels = [
 ]
 
 [[package]]
+name = "llama-index-embeddings-openai-like"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "llama-index-embeddings-openai" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/df/79e4748196213b55931d5f8377141fff41135f5988d5501860824cc95390/llama_index_embeddings_openai_like-0.3.1.tar.gz", hash = "sha256:cef7af4bce284e8e6730532dbd0aa325e77398a5d5524edb2d2e3acb122fb5b6", size = 3854, upload-time = "2026-03-13T16:15:20.647Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/8e/b9ea889f88318f2faa20b615989e12a15a133c9273630f9266fcf69f35a6/llama_index_embeddings_openai_like-0.3.1-py3-none-any.whl", hash = "sha256:167c7e462cde7d53ea907ceaffbbf10a750676c7c9f7bcc9bc9686a41921387a", size = 3631, upload-time = "2026-03-13T16:15:19.58Z" },
+]
+
+[[package]]
 name = "llama-index-instrumentation"
 version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1337,6 +1355,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/74/6e/1ef83a852296c55fe8c529b4476073eccaff150d57aceb3d6319a87dcc89/llama_index_llms_openai-0.7.10.tar.gz", hash = "sha256:aa8dabf08ea0b9740fc9dae9677f05049254be5e929794a886692eaf26973def", size = 27586, upload-time = "2026-07-21T23:16:18.087Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/89/854cb7b2e5be3b3c16561e93f3edd52d8a1b6e031be1aca4519b9fdd3917/llama_index_llms_openai-0.7.10-py3-none-any.whl", hash = "sha256:b76a0c3d4aaa9aba57dc0366ca6b2346c6819bed22973e334676d7a34704e46a", size = 28673, upload-time = "2026-07-21T23:16:17.062Z" },
+]
+
+[[package]]
+name = "llama-index-llms-openai-like"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "llama-index-core" },
+    { name = "llama-index-llms-openai" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/a3/16410b28d131aa113ada79f856b78cb68a8e92a1e27255ea9c36c27a5dec/llama_index_llms_openai_like-0.7.2.tar.gz", hash = "sha256:ed9ff73f975dce470f98ac61c982151ba78eedfa3fb9b03894bc1d1312b213ff", size = 5389, upload-time = "2026-04-23T23:05:32.525Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/0c/fdddaee5391d915d3d568d2d8dbdb7c95647e65bb94d4ddb31d47cef5daf/llama_index_llms_openai_like-0.7.2-py3-none-any.whl", hash = "sha256:1f45a7b1cec8fb3f5997684327ffe6c19f93e789c2fff35dc5522465850faf0b", size = 6602, upload-time = "2026-04-23T23:05:31.708Z" },
 ]
 
 [[package]]
