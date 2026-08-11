@@ -1,50 +1,63 @@
-import os
 from typing import List, Tuple
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.base_retriever import BaseRetriever
 from llama_index.core.postprocessor import SentenceTransformerRerank
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
-from llama_index.core.retrievers import AutoMergingRetriever, QueryFusionRetriever
-from llama_index.llms.openai_like import OpenAILike
+from llama_index.core.retrievers import AutoMergingRetriever
+from llama_index.core.schema import NodeWithScore, QueryBundle
 from llama_index.retrievers.bm25 import BM25Retriever
-from dotenv import load_dotenv
-load_dotenv()
 
-def build_query_engine(index: VectorStoreIndex) -> Tuple[BaseRetriever, List[BaseNodePostprocessor]]:
-    # Vector Retriever from ChromaDb
-    vector_retriever = index.as_retriever(similarity_top_k=25)
 
-    # BM25_Retriever from tf-idf
+class FastHybridRetriever(BaseRetriever):
+    """Combines Vector and BM25 retrievers with zero LLM overhead."""
+    def __init__(self, vector_retriever: BaseRetriever, bm25_retriever: BaseRetriever):
+        self.vector_retriever = vector_retriever
+        self.bm25_retriever = bm25_retriever
+        super().__init__()
+
+    def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        vec_nodes = self.vector_retriever.retrieve(query_bundle)
+        bm25_nodes = self.bm25_retriever.retrieve(query_bundle)
+
+        # Fast deduplication by node_id
+        seen_ids = set()
+        combined_nodes = []
+        for node in vec_nodes + bm25_nodes:
+            if node.node.node_id not in seen_ids:
+                seen_ids.add(node.node.node_id)
+                combined_nodes.append(node)
+
+        return combined_nodes
+
+
+def build_retriever_stack(index: VectorStoreIndex) -> Tuple[BaseRetriever, List[BaseNodePostprocessor]]:
+    """
+    Constructs the retriever stack ONCE.
+    Call this during application startup or index loading, NOT per query request!
+    """
+    # 1. Reduced top_k from 25 -> 12 to halve candidate workload
+    vector_retriever = index.as_retriever(similarity_top_k=12)
+
+    # 2. Build BM25 index ONCE (similarity_top_k=12)
     bm25_retriever = BM25Retriever.from_defaults(
         docstore=index.storage_context.docstore,
-        similarity_top_k=25
+        similarity_top_k=12
     )
 
-    # Query Fusion Retriever is hybrid retriever rather than a normal base retriever. Does both types of retrieval and stores chunks
-    hybrid_retriever = QueryFusionRetriever(
-        [vector_retriever, bm25_retriever],
-        similarity_top_k=25,
-        num_queries=1,
-        mode="reciprocal_rerank",
-        llm=OpenAILike(
-            model_name="llama-3.1-8b-instant",
-            api_base="https://api.groq.com/openai/v1",
-        api_key=os.getenv("GROQ_API_KEY")
-        )
-    )
+    # 3. Pure LLM-free hybrid fusion
+    hybrid_retriever = FastHybridRetriever(vector_retriever, bm25_retriever)
 
-    # Merges the retrievers chunks based on the parent nodes and the child nodes
+    # 4. Auto-Merging Retriever (threshold tuned to 0.4 for faster decision making)
     auto_merging_retriever = AutoMergingRetriever(
         hybrid_retriever,
         storage_context=index.storage_context,
-        simple_ratio_thresh=0.3
+        simple_ratio_thresh=0.4
     )
 
-    # Reranks and Query engine uses the reranker to answers to the Query
+    # 5. Cross-Encoder Reranker (processes top ~20 merged candidates down to top 5)
     reranker = SentenceTransformerRerank(
-        model="BAAI/bge-reranker-v2-m3",
-        top_n=5
+        model="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        top_n=5,
     )
 
-    # Return ONLY the retriever and the postprocessor, no QueryEngine!
     return auto_merging_retriever, [reranker]
