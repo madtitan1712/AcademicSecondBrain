@@ -2,16 +2,18 @@ import os
 import asyncio
 from llama_index.core import Settings
 from llama_index.embeddings.openai_like import OpenAILikeEmbedding
-from llama_index.core.chat_engine import CondensePlusContextChatEngine
-from llama_index.core.memory import ChatMemoryBuffer
 
 from src.rag.synthesis.engine import get_academic_llm
 from src.rag.ingestion.reader import load_documents_from_path
 from src.rag.ingestion.ingestion import run_ingestion
 from src.rag.ingestion.indexer import create_hierarchical_index
 from src.rag.retrieval.retreiver import build_retriever_stack
-from src.rag.synthesis.engine import format_response_with_sources
-from src.rag.ingestion.ingester import ingest_new_documents
+from src.rag.ingestion.ingester import ingest_new_documents, delete_document
+
+# New imports for testing registry and stateless chat
+from src.rag.registry.documents import list_documents
+from src.rag.registry.sessions import list_sessions, get_session_history
+from src.rag.synthesis.chat import handle_stateless_chat
 
 
 async def main():
@@ -47,32 +49,27 @@ async def main():
     print("\n3. Building retriever and postprocessors...")
     retriever, postprocessors = build_retriever_stack(index)
 
-    # 4. Assemble Academic Chat Engine with Groq
-    print("\n4. Building academic chat engine with Groq...")
-    memory = ChatMemoryBuffer.from_defaults(token_limit=3000)
+    # Note: We are no longer building the ChatEngine here!
+    # We will use the stateless handler per request to test the SQLite sessions.
 
-    chat_engine = CondensePlusContextChatEngine.from_defaults(
-        retriever=retriever,
-        node_postprocessors=postprocessors,
-        llm=groq_llm,
-        condense_llm=groq_llm,
-        memory=memory,
-        system_prompt=(
-            "You are a strict and precise academic research assistant. "
-            "Use the provided document context and conversation history to answer user questions. "
-            "Always cite relevant sources and papers when explaining methodology or findings."
-        )
-    )
+    print("\n" + "=" * 65)
+    print("          ACADEMIC SECOND BRAIN - TESTING SANDBOX          ")
+    print("=" * 65)
+    print(" Commands:")
+    print("  /upload <path>    - Ingest a new document")
+    print("  /docs             - List all active documents")
+    print("  /delete <name>    - Delete a document by file_name")
+    print("  /sessions         - List all chat sessions in SQLite")
+    print("  /history          - View history of the current session")
+    print("  /new              - Start a completely new chat session")
+    print("  exit / quit       - End the program")
+    print("=" * 65 + "\n")
 
-    # 5. Interactive Chat Loop
-    print("\n" + "=" * 60)
-    print("        ACADEMIC SECOND BRAIN - CHAT INTERFACE READY        ")
-    print("     Commands: 'exit', 'quit', or '/upload <path/to/pdf>'   ")
-    print("=" * 60 + "\n")
+    # Track the active session to simulate a connected frontend user
+    active_session_id = None
 
     while True:
         try:
-            # Note: For CLI scripts `input` is fine. If deploying to FastAPI, use API requests instead.
             user_input = input("\nYou: ").strip()
             if not user_input:
                 continue
@@ -81,31 +78,72 @@ async def main():
                 print("\nEnding chat session. Goodbye!")
                 break
 
-            # --- HOT UPLOAD COMMAND INTERCEPT ---
+            # --- DOCUMENT MANAGEMENT COMMANDS ---
             if user_input.lower().startswith("/upload "):
                 filepath = user_input.split(" ", 1)[1].strip()
                 if not os.path.exists(filepath):
                     print(f"\n[Error] File '{filepath}' not found.")
                     continue
-
                 print(f"\n[System] Initiating dynamic upload for {filepath}...")
                 result = ingest_new_documents([filepath], index)
-
-                print(f"Status: {result['status']}")
-                print(f"Message: {result['message']}")
-                print(f"Nodes Added: {result['added_leaf_nodes']} leaf / {result['added_total_nodes']} total")
-
-                # Clean Hot-swap of the BM25 Retriever
+                print(f"Status: {result['status']} | Msg: {result['message']}")
                 if result.get("bm25_retriever"):
                     retriever.update_bm25(result["bm25_retriever"])
                     print("[System] Active BM25 Retriever stack updated successfully.")
-
                 continue
-            # ------------------------------------
 
-            # Async execution for the chat generation to prevent blocking the event loop
-            raw_response = await chat_engine.achat(user_input)
-            result = format_response_with_sources(raw_response)
+            if user_input.lower() == "/docs":
+                docs = list_documents(index)
+                print("\n--- Active Documents ---")
+                for d in docs:
+                    print(f"- {d['file_name']} (Path: {d['file_path']} | Parts: {len(d['part_ids'])})")
+                print("------------------------")
+                continue
+
+            if user_input.lower().startswith("/delete "):
+                filename = user_input.split(" ", 1)[1].strip()
+                print(f"\n[System] Attempting to delete '{filename}'...")
+                result = delete_document(filename, index, retriever)
+                print(f"Status: {result['status']} | Msg: {result['message']}")
+                continue
+
+            # --- SESSION MANAGEMENT COMMANDS ---
+            if user_input.lower() == "/sessions":
+                sessions = list_sessions()
+                print("\n--- SQLite Sessions ---")
+                for s in sessions:
+                    marker = " (ACTIVE)" if s['session_id'] == active_session_id else ""
+                    print(f"- ID: {s['session_id']} | Created: {s['created_at']}{marker}")
+                print("-----------------------")
+                continue
+
+            if user_input.lower() == "/history":
+                if not active_session_id:
+                    print("\n[System] No active session history yet. Say hello first!")
+                    continue
+                history = get_session_history(active_session_id)
+                print(f"\n--- History for {active_session_id[:8]}... ---")
+                for msg in history:
+                    print(f"[{msg['role'].upper()}]: {msg['content'][:100]}...")
+                print("-----------------------------------")
+                continue
+
+            if user_input.lower() == "/new":
+                active_session_id = None
+                print("\n[System] Active session cleared. Next message will start a new session.")
+                continue
+
+            # --- STATELESS CHAT EXECUTION ---
+            # This mimics exactly what the FastAPI route will do
+            result = await handle_stateless_chat(
+                message=user_input,
+                retriever=retriever,
+                llm=groq_llm,
+                session_id=active_session_id
+            )
+
+            # Update active session based on what the stateless handler returns
+            active_session_id = result["session_id"]
 
             print("\n" + "=" * 60)
             print("                      SYNTHESIZED ANSWER                     ")
@@ -125,7 +163,7 @@ async def main():
             print("\nSession interrupted. Goodbye!")
             break
         except Exception as e:
-            print(f"\nError processing chat query: {e}")
+            print(f"\n[Error] {e}")
 
 
 if __name__ == "__main__":

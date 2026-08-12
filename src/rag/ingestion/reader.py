@@ -21,8 +21,16 @@ def load_documents_from_path(path: Union[str, Path, List[Union[str, Path]]]) -> 
 
     if isinstance(path, list):
         input_files = [str(p) for p in path]
-        document = SimpleDirectoryReader(input_files=input_files, file_extractor=extractors)
+        document = SimpleDirectoryReader(
+            input_files=input_files,
+            file_extractor=extractors,
+            filename_as_id=True
+        )
     else:
-        document = SimpleDirectoryReader(input_dir=str(path), file_extractor=extractors)
+        document = SimpleDirectoryReader(
+            input_dir=str(path),
+            file_extractor=extractors,
+            filename_as_id=True
+        )
 
     return document.load_data()

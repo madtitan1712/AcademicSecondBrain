@@ -91,3 +91,5 @@ htmlcov/
 *.swo
 *~
 .DS_Store
+*.db
+*.sqlite
