@@ -5,8 +5,9 @@ from llama_index.core import VectorStoreIndex, StorageContext, load_index_from_s
 from llama_index.core.schema import BaseNode
 from llama_index.vector_stores.chroma import ChromaVectorStore
 
-PERSIST_DIR = "./storage"
-CHROMA_PATH = "./chroma_db"
+PERSIST_DIR = os.getenv("PERSIST_DIR", "./storage")
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_db")
+CHROMA_COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "academic_collection")
 
 
 def create_hierarchical_index(
@@ -16,7 +17,7 @@ def create_hierarchical_index(
         persist_dir: str = PERSIST_DIR
 ) -> VectorStoreIndex:
     db = chromadb.PersistentClient(path=db_path)
-    chroma_collection = db.get_or_create_collection('test_collection')
+    chroma_collection = db.get_or_create_collection(CHROMA_COLLECTION_NAME)
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 
     # 1. LOAD EXISTING: If Chroma has data AND storage dir exists

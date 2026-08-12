@@ -29,8 +29,39 @@ class FastHybridRetriever(BaseRetriever):
 
         return combined_nodes
 
+    async def _aretrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        vec_nodes = await self.vector_retriever.aretrieve(query_bundle)
+        bm25_nodes = await self.bm25_retriever.aretrieve(query_bundle)
 
-def build_retriever_stack(index: VectorStoreIndex) -> Tuple[BaseRetriever, List[BaseNodePostprocessor]]:
+        seen_ids = set()
+        combined_nodes = []
+        for node in vec_nodes + bm25_nodes:
+            if node.node.node_id not in seen_ids:
+                seen_ids.add(node.node.node_id)
+                combined_nodes.append(node)
+
+        return combined_nodes
+
+
+class AcademicRetrieverWrapper(BaseRetriever):
+    """Wraps the full retriever stack and exposes safe internal updates."""
+    def __init__(self, hybrid_retriever: FastHybridRetriever, auto_merging_retriever: AutoMergingRetriever):
+        self.hybrid_retriever = hybrid_retriever
+        self.auto_merging_retriever = auto_merging_retriever
+        super().__init__()
+
+    def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        return self.auto_merging_retriever.retrieve(query_bundle)
+
+    async def _aretrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
+        return await self.auto_merging_retriever.aretrieve(query_bundle)
+
+    def update_bm25(self, new_bm25_retriever: BaseRetriever):
+        """Safely updates the BM25 retriever in the underlying stack."""
+        self.hybrid_retriever.bm25_retriever = new_bm25_retriever
+
+
+def build_retriever_stack(index: VectorStoreIndex) -> Tuple[AcademicRetrieverWrapper, List[BaseNodePostprocessor]]:
     """
     Constructs the retriever stack ONCE.
     Call this during application startup or index loading, NOT per query request!
@@ -54,10 +85,13 @@ def build_retriever_stack(index: VectorStoreIndex) -> Tuple[BaseRetriever, List[
         simple_ratio_thresh=0.4
     )
 
-    # 5. Cross-Encoder Reranker (processes top ~20 merged candidates down to top 5)
+    # 5. Wrapper class to manage retriever state cleanly
+    academic_retriever = AcademicRetrieverWrapper(hybrid_retriever, auto_merging_retriever)
+
+    # 6. Cross-Encoder Reranker (processes top ~20 merged candidates down to top 5)
     reranker = SentenceTransformerRerank(
         model="cross-encoder/ms-marco-MiniLM-L-6-v2",
         top_n=5,
     )
 
-    return auto_merging_retriever, [reranker]
+    return academic_retriever, [reranker]
