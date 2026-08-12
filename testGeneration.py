@@ -139,7 +139,8 @@ async def main():
                 message=user_input,
                 retriever=retriever,
                 llm=groq_llm,
-                session_id=active_session_id
+                session_id=active_session_id,
+                node_postprocessors=postprocessors
             )
 
             # Update active session based on what the stateless handler returns

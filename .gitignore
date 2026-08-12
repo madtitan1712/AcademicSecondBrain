@@ -93,3 +93,4 @@ htmlcov/
 .DS_Store
 *.db
 *.sqlite
+/uploads
